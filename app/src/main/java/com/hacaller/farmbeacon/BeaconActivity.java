@@ -17,12 +17,24 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.google.android.gms.nearby.Nearby;
+import com.google.android.gms.nearby.messages.Message;
+import com.google.android.gms.nearby.messages.MessageListener;
+import com.google.android.gms.nearby.messages.MessagesClient;
+import com.google.android.gms.nearby.messages.MessagesOptions;
+import com.google.android.gms.nearby.messages.NearbyPermissions;
+
 import java.util.List;
 
 public class BeaconActivity extends AppCompatActivity {
 
+    public final String TAG = getClass().getSimpleName();
+
     private BluetoothAdapter mBluetoothAdapter;
     BluetoothLeScanner bluetoothLeScanner;
+    Message mMessage;
+    MessageListener mMessageListener;
+    MessagesClient mMessagesClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,14 +46,45 @@ public class BeaconActivity extends AppCompatActivity {
             finish();
         }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED){
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 998);
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 998);
         } else {
+             mMessagesClient = Nearby.getMessagesClient(this, new MessagesOptions.Builder()
+                    .setPermissions(NearbyPermissions.BLE)
+                    .build());
             initBleManager();
         }
 
+        mMessageListener = new MessageListener() {
+            @Override
+            public void onFound(Message message) {
+                Log.d(TAG, "Found message: " + new String(message.getContent()));
+            }
+
+            @Override
+            public void onLost(Message message) {
+                Log.d(TAG, "Lost sight of message: " + new String(message.getContent()));
+            }
+        };
+
+        mMessage = new Message("Hello World".getBytes());
+
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        Nearby.getMessagesClient(this).publish(mMessage);
+        Nearby.getMessagesClient(this).subscribe(mMessageListener);
+    }
+
+    @Override
+    public void onStop() {
+        Nearby.getMessagesClient(this).unpublish(mMessage);
+        Nearby.getMessagesClient(this).unsubscribe(mMessageListener);
+        super.onStop();
     }
 
     @Override
